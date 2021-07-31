@@ -50,8 +50,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "dict-gen-rs"
-version = "0.1.0"
+name = "dictgen"
+version = "1.0.0"
 dependencies = [
  "clap",
  "logos",
