@@ -154,7 +154,7 @@ pub fn build_source<P: AsRef<Path>>(factory_parameters: &FactoryParameters, path
                 EntryType::Int8(ref range) => ("VAR_INT8", 1, range.min as i32, range.max as i32),
                 EntryType::UInt16(ref range) => ("VAR_UINT16", 2, range.min as i32, range.max as i32),
                 EntryType::Int16(ref range) => ("VAR_INT16", 2, range.min as i32, range.max as i32),
-                EntryType::UInt32(ref range) => ("VAR_UINT32", 4, range.min.max(i32::MAX as u32) as i32, range.max.max(i32::MAX as u32) as i32),
+                EntryType::UInt32(ref range) => ("VAR_UINT32", 4, range.min.min(i32::MAX as u32) as i32, range.max.min(i32::MAX as u32) as i32),
                 EntryType::Int32(ref range) => ("VAR_INT32", 4, range.min as i32, range.max as i32),
                 EntryType::Float => ("VAR_FLOAT", 4, 0, 0),
                 EntryType::Bool => ("VAR_UINT8", 1, 0, 1),

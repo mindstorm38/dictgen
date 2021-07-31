@@ -181,7 +181,7 @@ fn process_entry_params(entry: &mut Entry, params: &HashMap<&str, &str>) -> Resu
 
     }
 
-    if let Some(&val) = params.get("forced_value") {
+    if let Some(&val) = params.get("value").or_else(|| params.get("forced_value")) {
         let mut value = FactoryValue::default_for_type(&entry.typ);
         if let Err(err) = parse_factory_value(val, entry.identifier.as_str(), &mut value, None) {
             return Err(format!("Failed to parse forced value parameter. {}", err))
@@ -204,11 +204,7 @@ fn process_entry_params(entry: &mut Entry, params: &HashMap<&str, &str>) -> Resu
                 }
             },
             "entries_checksum" => {
-                if let EntryType::UInt8(_) = entry.typ {
-                    EntryValueProcessor::Checksum
-                } else {
-                    return Err(format!("The 'entries_checksum' value processor requires a UINT8 type."))
-                }
+                return Err(format!("The 'entries_checksum' value processor is deprecated."))
             },
             _ => return Err(format!("Unknown value processor '{}'.", val))
         };
@@ -275,7 +271,6 @@ pub fn parse_factory_parameters<'a, 'b>(input: &'a str, dict: &'b Dictionary) ->
             }
         }
     }
-    params.apply_value_processors();
     Ok(params)
 }
 

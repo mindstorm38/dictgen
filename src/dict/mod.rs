@@ -62,10 +62,9 @@ pub enum EntryKind {
 
 #[derive(Debug)]
 pub enum EntryValueProcessor {
-    None,
     Constant(FactoryValue),
     Size,
-    Checksum
+    None,
 }
 
 
@@ -172,10 +171,37 @@ impl<'a> FactoryParameters<'a> {
 
     pub fn new(dict: &'a Dictionary) -> FactoryParameters<'a> {
 
+        let mut post_proc_size = Vec::new();
+
         let mut values = HashMap::new();
         for entry in &dict.entries {
             if let EntryKind::Parameter = entry.kind {
-                values.insert(entry.identifier.clone(), FactoryValue::default_for_type(&entry.typ));
+
+                let mut value = FactoryValue::default_for_type(&entry.typ);
+
+                match &entry.value_processor {
+                    EntryValueProcessor::Constant(const_value) => {
+                        if std::mem::discriminant(&value) == std::mem::discriminant(&const_value) {
+                            value = const_value.clone();
+                        }
+                    }
+                    EntryValueProcessor::Size => {
+                        post_proc_size.push(&entry.identifier);
+                    }
+                    EntryValueProcessor::None => {}
+                }
+
+                values.insert(entry.identifier.clone(), value);
+
+            }
+        }
+
+        let values_count = values.len();
+        for entry_id in post_proc_size {
+            if let Some(value) = values.get_mut(entry_id) {
+                if let FactoryValue::UInt16(size, _) = value {
+                    *size = values_count as u16
+                }
             }
         }
 
@@ -197,35 +223,6 @@ impl<'a> FactoryParameters<'a> {
             if let EntryKind::Parameter = entry.kind {
                 if let Some(value) = self.values.get(&entry.identifier) {
                     callback(&**entry, value);
-                }
-            }
-        }
-    }
-
-    pub fn apply_value_processors(&mut self) {
-        let parameters_count = self.values.len();
-        for entry in &self.dict.entries {
-            if let EntryKind::Parameter = entry.kind {
-                match entry.value_processor {
-                    EntryValueProcessor::None => {}
-                    _ => {
-                        if let Some(value) = self.values.get_mut(&entry.identifier) {
-                            match entry.value_processor {
-                                EntryValueProcessor::Constant(ref const_value) => {
-                                    *value = const_value.clone()
-                                }
-                                EntryValueProcessor::Size => {
-                                    if let FactoryValue::UInt16(size, _) = value {
-                                        *size = parameters_count as u16
-                                    }
-                                }
-                                EntryValueProcessor::Checksum => {
-                                    // TODO
-                                }
-                                EntryValueProcessor::None => unreachable!()
-                            }
-                        }
-                    }
                 }
             }
         }
