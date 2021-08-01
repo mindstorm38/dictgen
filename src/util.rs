@@ -1,4 +1,4 @@
-use std::num::ParseIntError;
+/*use std::num::ParseIntError;
 
 
 pub trait FromStrWithRadix: Sized {
@@ -36,4 +36,4 @@ macro_rules! impl_integer_from_str {
     };
 }
 
-impl_integer_from_str!(u8, i8, u16, i16, u32, i32);
+impl_integer_from_str!(u8, i8, u16, i16, u32, i32);*/

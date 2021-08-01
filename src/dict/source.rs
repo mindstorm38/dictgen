@@ -48,7 +48,8 @@ pub fn build_header<P: AsRef<Path>, Q: AsRef<Path>>(dict: &Dictionary, path: P, 
         "VAR_UINT32",
         "VAR_INT32",
         "VAR_FLOAT",
-        "VAR_STRING"
+        "VAR_STRING",
+        "VAR_REGION"
     ]);
 
     writeln!(writer);
@@ -80,11 +81,6 @@ pub fn build_header<P: AsRef<Path>, Q: AsRef<Path>>(dict: &Dictionary, path: P, 
 
     for entry in dict.get_entries() {
 
-        let struct_buf = match entry.kind {
-            EntryKind::Parameter => &mut parameters_struct,
-            EntryKind::Variable => &mut variables_struct
-        };
-
         let field_type = match entry.typ {
             EntryType::UInt8(_) => "uint8_t",
             EntryType::Int8(_) => "int8_t",
@@ -96,6 +92,12 @@ pub fn build_header<P: AsRef<Path>, Q: AsRef<Path>>(dict: &Dictionary, path: P, 
             EntryType::Bool => "uint8_t",
             EntryType::String(_) => "uint8_t",
             EntryType::Ref => "uint16_t",
+            EntryType::Region => continue
+        };
+
+        let struct_buf = match entry.kind {
+            EntryKind::Parameter => &mut parameters_struct,
+            EntryKind::Variable => &mut variables_struct
         };
 
         let field_array = match entry.typ {
@@ -159,7 +161,8 @@ pub fn build_source<P: AsRef<Path>>(factory_parameters: &FactoryParameters, path
                 EntryType::Float => ("VAR_FLOAT", 4, 0, 0),
                 EntryType::Bool => ("VAR_UINT8", 1, 0, 1),
                 EntryType::String(len) => ("VAR_STRING", len, 0, 0),
-                EntryType::Ref => ("VAR_UINT16", 2, 0, u16::MAX as i32)
+                EntryType::Ref => ("VAR_UINT16", 2, 0, u16::MAX as i32),
+                EntryType::Region => ("VAR_REGION", 0, 0, 0)
             };
 
             let access_type_enum = match entry.access {
@@ -168,19 +171,22 @@ pub fn build_source<P: AsRef<Path>>(factory_parameters: &FactoryParameters, path
                 EntryAccess::ReadWrite => "READ_WRITE"
             };
 
-            let pointer_prefix = match entry.kind {
-                EntryKind::Parameter => VAR_PARAMETERS,
-                EntryKind::Variable => VAR_VARIABLES,
+            let pointer = if let EntryType::Region = entry.typ {
+                "NULL".to_string()
+            } else {
+                format!("&{}.{}", match entry.kind {
+                    EntryKind::Parameter => VAR_PARAMETERS,
+                    EntryKind::Variable => VAR_VARIABLES,
+                }, entry.identifier)
             };
 
-            writeln!(writer, "\t{{ 0x{:04X}, \"{}\", {}, {}, {}, &{}.{}, {}, {} }},",
+            writeln!(writer, "\t{{ 0x{:04X}, \"{}\", {}, {}, {}, {}, {}, {} }},",
                      entry.index,
                      entry.identifier,
                      type_enum,
                      type_len,
                      access_type_enum,
-                     pointer_prefix,
-                     entry.identifier,
+                     pointer,
                      min, max
             );
 
@@ -218,15 +224,15 @@ fn write_typedef_struct(writer: &mut impl IoWrite, name: &str, items: &[&str]) -
 
 fn get_factory_value_repr(value: &FactoryValue) -> String {
     match value {
-        FactoryValue::UInt8(val, _) => val.to_string(),
-        FactoryValue::Int8(val, _) => val.to_string(),
-        FactoryValue::UInt16(val, _) => val.to_string(),
-        FactoryValue::Int16(val, _) => val.to_string(),
-        FactoryValue::UInt32(val, _) => val.to_string(),
-        FactoryValue::Int32(val, _) => val.to_string(),
+        FactoryValue::UInt8(val) => val.to_string(),
+        FactoryValue::Int8(val) => val.to_string(),
+        FactoryValue::UInt16(val) => val.to_string(),
+        FactoryValue::Int16(val) => val.to_string(),
+        FactoryValue::UInt32(val) => val.to_string(),
+        FactoryValue::Int32(val) => val.to_string(),
         FactoryValue::Float(val) => val.to_string(),
         FactoryValue::Bool(val) => (if *val { "1" } else { "0" }).to_string(),
-        FactoryValue::String(val, _) => format!("{:?}", val),
+        FactoryValue::String(val) => format!("{:?}", val),
         FactoryValue::Ref(val) => format!("0x{:04X}", *val)
     }
 }

@@ -1,5 +1,6 @@
 use clap::{App, Arg};
 use std::path::Path;
+use crate::dict::FactoryParameters;
 
 mod dict;
 mod util;
@@ -19,15 +20,16 @@ fn main() {
         .arg(Arg::with_name("DICT")
             .index(1)
             .required(true)
-            .help("Dictionary path (.dict)"))
-        .arg(Arg::with_name("FACT")
+            .help("Dictionary file path (.dict)"))
+        .arg(Arg::with_name("DEST")
             .index(2)
             .required(true)
-            .help("Factory path (.fact)"))
-        .arg(Arg::with_name("DEST")
-            .index(3)
-            .required(true)
             .help("Destination directory for source files"))
+        .arg(Arg::with_name("factory_params_path")
+            .long("factory")
+            .short("f")
+            .takes_value(true)
+            .help("Factory parameters file path (.fact)"))
         .arg(Arg::with_name("header_extension_path")
             .long("header-ext")
             .short("h")
@@ -59,21 +61,26 @@ fn main() {
         }
     };
 
-    println!("Parsing factory parameters file...");
-    let fact_path = matches.value_of("FACT").unwrap();
-    let fact = match dict::parser::parse_factory_parameters_from_file(fact_path, &dict) {
-        Ok(res) => match res {
-            Ok(fact) => fact,
+    let mut fact = FactoryParameters::new(&dict);
+
+    if let Some(fact_path) = matches.value_of("factory_params_path") {
+        println!("Parsing factory parameters file...");
+        match dict::parser::parse_factory_parameters_from_file(fact_path, &mut fact) {
+            Ok(res) => match res {
+                Ok(_) => {},
+                Err(err) => {
+                    eprintln!("Failed to parse factory parameters file at '{}':\n{}", fact_path, err);
+                    std::process::exit(EXIT_PARSING_ERROR);
+                }
+            },
             Err(err) => {
-                eprintln!("Failed to parse factory parameters file at '{}':\n{}", fact_path, err);
-                std::process::exit(EXIT_PARSING_ERROR);
+                eprintln!("Factory parameters file was not found at '{}': {}", dict_path, err);
+                std::process::exit(EXIT_INVALID_FILE);
             }
-        },
-        Err(err) => {
-            eprintln!("Factory parameters file was not found at '{}': {}", dict_path, err);
-            std::process::exit(EXIT_INVALID_FILE);
-        }
-    };
+        };
+    }
+
+    fact.fix_missing_values();
 
     let header_extension_path = matches.value_of("header_extension_path").map(|raw_path| Path::new(raw_path));
     let base_file_name = matches.value_of("base_file_name").unwrap();
