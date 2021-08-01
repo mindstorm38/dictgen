@@ -1,6 +1,8 @@
+use crate::dict::FactoryParameters;
+use crate::util::PrefixSuffix;
+
 use clap::{App, Arg};
 use std::path::Path;
-use crate::dict::FactoryParameters;
 
 mod dict;
 mod util;
@@ -14,7 +16,7 @@ const EXIT_BUILDING_ERROR: i32 = 3;
 fn main() {
 
     let matches = App::new("Dictionary Generator")
-        .version("1.0.1")
+        .version("1.0.2")
         .author("Théo Rozier <contact@theorozier.fr>")
         .about("Generate dictionary C source files from dictionary and factory parameters files")
         .arg(Arg::with_name("DICT")
@@ -43,6 +45,14 @@ fn main() {
             .long("inc-guard")
             .default_value("__DICTIONARY_H")
             .help("Change the default include guard of the header source file (#ifndef [...] #define [...] #endif)"))
+        .arg(Arg::with_name("index_define_prefix")
+            .long("idx-def-prefix")
+            .default_value("DICT_")
+            .help("Change the default prefix prepended to '#define' of entry indices"))
+        .arg(Arg::with_name("index_define_suffix")
+            .long("idx-def-suffix")
+            .default_value("_IDX")
+            .help("Change the default suffix appended to '#define' of entry indices"))
         .get_matches();
 
     println!("Parsing dictionary file...");
@@ -94,9 +104,15 @@ fn main() {
     }
 
     println!("Building header file...");
+
+    let mut index_define_template = PrefixSuffix {
+        prefix: matches.value_of("index_define_prefix").unwrap(),
+        suffix: matches.value_of("index_define_suffix").unwrap()
+    };
+
     let header_file_name = format!("{}.h", base_file_name);
     let header_path = dir_path.join(&header_file_name);
-    if let Err(err) = dict::source::build_header(&dict, header_path, include_guard, header_extension_path) {
+    if let Err(err) = dict::source::build_header(&dict, header_path, include_guard, header_extension_path, index_define_template) {
         eprintln!("Failed to build header file: {}", err);
         std::process::exit(EXIT_BUILDING_ERROR);
     }

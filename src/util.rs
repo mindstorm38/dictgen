@@ -1,39 +1,14 @@
-/*use std::num::ParseIntError;
 
-
-pub trait FromStrWithRadix: Sized {
-    fn from_str_with_radix(src: &str) -> Result<Self, ParseIntError>;
+pub struct PrefixSuffix<'a, 'b> {
+    pub prefix: &'a str,
+    pub suffix: &'b str
 }
 
-fn parse_integer_radix(src: &str) -> (&str, u32) {
-    let mut chars = src.char_indices();
-    if let Some((_, '0')) = chars.next() {
-        match chars.next() {
-            Some((idx, c)) => {
-                let radix = match c {
-                    'b' => 2,
-                    'o' => 8,
-                    'x' => 16,
-                    _ => 10
-                };
-                (&src[(idx + 1)..], radix)
-            }
-            _ => (src, 10)
-        }
-    } else {
-        (src, 10)
+
+impl PrefixSuffix<'_, '_> {
+
+    pub fn format(&self, text: &str) -> String {
+        format!("{}{}{}", self.prefix, text, self.suffix)
     }
-}
 
-macro_rules! impl_integer_from_str {
-    ($($t:ty),+) => {
-        $(impl FromStrWithRadix for $t {
-            fn from_str_with_radix(src: &str) -> Result<Self, ParseIntError> {
-                let (slice, radix) = parse_integer_radix(src);
-                <$t>::from_str_radix(slice, radix)
-            }
-        })+
-    };
 }
-
-impl_integer_from_str!(u8, i8, u16, i16, u32, i32);*/

@@ -4,6 +4,7 @@ use std::fs::File;
 
 use super::{Dictionary, EntryKind, EntryType, FactoryParameters};
 use crate::dict::{FactoryValue, EntryAccess};
+use crate::util::PrefixSuffix;
 use std::path::Path;
 
 
@@ -20,7 +21,13 @@ static VAR_DICTIONARY: &str = "dictionary";
 
 
 #[allow(unused_must_use)]
-pub fn build_header<P: AsRef<Path>, Q: AsRef<Path>>(dict: &Dictionary, path: P, include_guard: &str, header_path: Option<Q>) -> IoResult<()> {
+pub fn build_header(
+    dict: &Dictionary,
+    path: impl AsRef<Path>,
+    include_guard: &str,
+    header_path: Option<impl AsRef<Path>>,
+    index_define_template: PrefixSuffix
+) -> IoResult<()> {
 
     let mut writer = BufWriter::new(File::create(path)?);
 
@@ -44,22 +51,27 @@ pub fn build_header<P: AsRef<Path>, Q: AsRef<Path>>(dict: &Dictionary, path: P, 
         if entry.index != 0 {
 
             let macro_id: String = entry.identifier.char_indices()
-                .fold(String::new(), |mut buf, (idx, ch)| {
+                .fold((String::new(), false), |(mut buf, prev_uppercase), (idx, ch)| {
+                    let mut is_uppercase = false;
                     if ch.is_alphanumeric() {
-                        if ch.is_uppercase() && idx != 0 {
-                            buf.push('_');
+                        if ch.is_uppercase() {
+                            if idx != 0 && !prev_uppercase {
+                                buf.push('_');
+                            }
+                            is_uppercase = true;
                         }
                         buf.extend(ch.to_uppercase());
                     } else {
                         buf.push('_');
                     }
-                    buf
-                });
+                    (buf, is_uppercase)
+                }).0;
 
-            writeln!(writer, "#define {} 0x{:04X}", macro_id, entry.index);
+            writeln!(writer, "#define {} 0x{:04X}", index_define_template.format(&macro_id), entry.index);
 
         }
     }
+
     writeln!(writer);
 
     if !dict.get_defines().is_empty() {
