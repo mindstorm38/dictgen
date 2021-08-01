@@ -1,5 +1,4 @@
 use logos::{Logos, Lexer};
-use std::num::ParseIntError;
 
 
 #[derive(Logos, Debug)]
@@ -25,8 +24,8 @@ pub enum Token<'source> {
     Plus,
     #[token("=")]
     Equal,
-    #[regex("#define ")]
-    Define,  // TODO
+    #[regex("#define [^\\r\\n]*", decode_define)]
+    Define(&'source str),
     #[error]
     #[regex("[ \\t\\r\\f]+", logos::skip)]
     #[regex("#[^\\r\\n]*", logos::skip)]
@@ -96,6 +95,11 @@ fn decode_string<'source>(lex: &mut TokenLexer<'source>) -> Option<String> {
         }
     }
     Some(buf)
+}
+
+
+fn decode_define<'source>(lex: &mut TokenLexer<'source>) -> Option<&'source str> {
+    Some(&lex.slice()[8..])
 }
 
 

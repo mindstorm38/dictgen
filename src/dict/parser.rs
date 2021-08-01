@@ -2,9 +2,7 @@ use super::{Dictionary, Entry, EntryKind, EntryAccess, EntryType, IntRange, Fact
 use super::lexer::{Token, TokenLexer, PreParsedInt, FromPreParsedInt};
 
 use std::io::{Result as IoResult};
-use std::collections::HashMap;
 use std::str::FromStr;
-use crate::dict::lexer::lex;
 
 
 // Specific to dictionary parsing //
@@ -22,8 +20,12 @@ pub fn parse_dictionary(input: &str) -> Result<Dictionary, String> {
         match lexer.next() {
             None => break,
             Some(Token::NewLine) => continue,
+            Some(Token::Define(def)) => {
+                dict.add_define(def.to_string());
+                continue
+            },
             Some(Token::OpenBracket) => {},
-            _ => return Err(format!("Expected an open bracket '[' before index."))
+            _ => return Err(format!("Expected an open bracket '[' before entry index."))
         }
         match parse_entry(&mut lexer) {
             Ok(entry) => dict.add_entry(entry),

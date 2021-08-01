@@ -40,6 +40,35 @@ pub fn build_header<P: AsRef<Path>, Q: AsRef<Path>>(dict: &Dictionary, path: P, 
 
     writeln!(writer, "#define {} {}\n", MACRO_ENTRY_COUNT, dict.entries.len());
 
+    for entry in dict.get_entries() {
+        if entry.index != 0 {
+
+            let macro_id: String = entry.identifier.char_indices()
+                .fold(String::new(), |mut buf, (idx, ch)| {
+                    if ch.is_alphanumeric() {
+                        if ch.is_uppercase() && idx != 0 {
+                            buf.push('_');
+                        }
+                        buf.extend(ch.to_uppercase());
+                    } else {
+                        buf.push('_');
+                    }
+                    buf
+                });
+
+            writeln!(writer, "#define {} 0x{:04X}", macro_id, entry.index);
+
+        }
+    }
+    writeln!(writer);
+
+    if !dict.get_defines().is_empty() {
+        for define in dict.get_defines() {
+            writeln!(writer, "#define {}", define);
+        }
+        writeln!(writer);
+    }
+
     write_typedef_enum(&mut writer, TYPEDEF_VAR_TYPE, &[
         "VAR_UINT8",
         "VAR_INT8",

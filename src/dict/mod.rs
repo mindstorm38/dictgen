@@ -102,7 +102,8 @@ impl Entry {
 pub struct Dictionary {
     entries: Vec<Rc<Entry>>,
     entries_by_id: HashMap<String, Rc<Entry>>,
-    parameters_count: usize
+    parameters_count: usize,
+    defines: Vec<String>
 }
 
 impl Dictionary {
@@ -111,7 +112,8 @@ impl Dictionary {
         Dictionary {
             entries: Vec::new(),
             entries_by_id: HashMap::new(),
-            parameters_count: 0
+            parameters_count: 0,
+            defines: Vec::new()
         }
     }
 
@@ -130,6 +132,14 @@ impl Dictionary {
 
     pub fn get_entries(&self) -> &[Rc<Entry>] {
         &self.entries[..]
+    }
+
+    pub fn add_define(&mut self, define: String) {
+        self.defines.push(define);
+    }
+
+    pub fn get_defines(&self) -> &[String] {
+        &self.defines[..]
     }
 
 }
