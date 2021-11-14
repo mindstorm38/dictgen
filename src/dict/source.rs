@@ -1,11 +1,12 @@
 use std::io::{Write as IoWrite, BufWriter, Result as IoResult};
-use std::fmt::Write as FmtWrite;
+use std::fmt::{Write as FmtWrite, Display, Formatter};
+use std::cmp::Ordering;
+use std::path::Path;
 use std::fs::File;
 
 use super::{Dictionary, EntryKind, EntryType, FactoryParameters};
 use crate::dict::{FactoryValue, EntryAccess};
 use crate::util::PrefixSuffix;
-use std::path::Path;
 
 
 static MACRO_ENTRY_COUNT: &str = "DICTIONARY_ENTRY_COUNT";
@@ -16,7 +17,7 @@ static TYPEDEF_PARAMETERS_TABLE: &str = "parametersTable_t";
 static TYPEDEF_VARIABLES_TABLE: &str = "variablesTable_t";
 static VAR_PARAMETERS: &str = "parameters";
 static VAR_VARIABLES: &str = "variables";
-static VAR_FACTORY_TABLE: &str = "factory_VarTable";
+static VAR_FACTORY_PARAMETERS: &str = "factoryParameters";
 static VAR_DICTIONARY: &str = "dictionary";
 
 
@@ -90,7 +91,8 @@ pub fn build_header(
         "VAR_INT32",
         "VAR_FLOAT",
         "VAR_STRING",
-        "VAR_REGION"
+        "VAR_REGION",
+        "VAR_STRUCT"
     ]);
 
     writeln!(writer);
@@ -120,7 +122,20 @@ pub fn build_header(
     let mut parameters_struct = String::new();
     let mut variables_struct = String::new();
 
-    for entry in dict.get_entries() {
+    // Here we sort entries to place entries with unsupported factory values in last place, fields
+    // placed at the end of a struct can be skipped for the factory parameters definition.
+    let mut sorted_entries = Vec::from(dict.get_entries());
+    sorted_entries.sort_by(|a, b| {
+        let a_supported = FactoryValue::is_type_supported(&a.typ);
+        let b_supported = FactoryValue::is_type_supported(&b.typ);
+        match (a_supported, b_supported) {
+            (true, false) => Ordering::Less,
+            (false, true) => Ordering::Greater,
+            (_, _) => Ordering::Equal
+        }
+    });
+
+    for entry in sorted_entries {
 
         let field_type = match entry.typ {
             EntryType::UInt8(_) => "uint8_t",
@@ -133,7 +148,8 @@ pub fn build_header(
             EntryType::Bool => "uint8_t",
             EntryType::String(_) => "uint8_t",
             EntryType::Ref => "uint16_t",
-            EntryType::Region => continue
+            EntryType::Region => continue,
+            EntryType::Struct(ref name) => name.as_str()
         };
 
         let struct_buf = match entry.kind {
@@ -158,7 +174,7 @@ pub fn build_header(
     writeln!(writer, "}} {};\n", TYPEDEF_VARIABLES_TABLE);
     writeln!(writer, "extern {} {};", TYPEDEF_PARAMETERS_TABLE, VAR_PARAMETERS);
     writeln!(writer, "extern {} {};", TYPEDEF_VARIABLES_TABLE, VAR_VARIABLES);
-    writeln!(writer, "extern const {} {};", TYPEDEF_PARAMETERS_TABLE, VAR_FACTORY_TABLE);
+    writeln!(writer, "extern const {} {};", TYPEDEF_PARAMETERS_TABLE, VAR_FACTORY_PARAMETERS);
     writeln!(writer, "extern const {} {}[];\n", TYPEDEF_ENTRY, VAR_DICTIONARY);
     writeln!(writer, "#endif");
 
@@ -177,7 +193,7 @@ pub fn build_source<P: AsRef<Path>>(factory_parameters: &FactoryParameters, path
     writeln!(writer, "{} {};", TYPEDEF_PARAMETERS_TABLE, VAR_PARAMETERS);
     writeln!(writer, "{} {};", TYPEDEF_VARIABLES_TABLE, VAR_VARIABLES);
 
-    writeln!(writer, "\nconst {} {} = {{", TYPEDEF_PARAMETERS_TABLE, VAR_FACTORY_TABLE);
+    writeln!(writer, "\nconst {} {} = {{", TYPEDEF_PARAMETERS_TABLE, VAR_FACTORY_PARAMETERS);
 
     factory_parameters.each_values_ordered(|entry, value| {
         writeln!(writer, "\t{}, // {} ({})", get_factory_value_repr(value), entry.identifier, entry.description);
@@ -193,17 +209,18 @@ pub fn build_source<P: AsRef<Path>>(factory_parameters: &FactoryParameters, path
         if entry.index != 0 {
 
             let (type_enum, type_len, min, max) = match entry.typ {
-                EntryType::UInt8(ref range) => ("VAR_UINT8", 1, range.min as i32, range.max as i32),
-                EntryType::Int8(ref range) => ("VAR_INT8", 1, range.min as i32, range.max as i32),
-                EntryType::UInt16(ref range) => ("VAR_UINT16", 2, range.min as i32, range.max as i32),
-                EntryType::Int16(ref range) => ("VAR_INT16", 2, range.min as i32, range.max as i32),
-                EntryType::UInt32(ref range) => ("VAR_UINT32", 4, range.min.min(i32::MAX as u32) as i32, range.max.min(i32::MAX as u32) as i32),
-                EntryType::Int32(ref range) => ("VAR_INT32", 4, range.min as i32, range.max as i32),
-                EntryType::Float => ("VAR_FLOAT", 4, 0, 0),
-                EntryType::Bool => ("VAR_UINT8", 1, 0, 1),
-                EntryType::String(len) => ("VAR_STRING", len, 0, 0),
-                EntryType::Ref => ("VAR_UINT16", 2, 0, u16::MAX as i32),
-                EntryType::Region => ("VAR_REGION", 0, 0, 0)
+                EntryType::UInt8(ref range) => ("VAR_UINT8", TypeLen::Static(1), range.min as i32, range.max as i32),
+                EntryType::Int8(ref range) => ("VAR_INT8", TypeLen::Static(1), range.min as i32, range.max as i32),
+                EntryType::UInt16(ref range) => ("VAR_UINT16", TypeLen::Static(2), range.min as i32, range.max as i32),
+                EntryType::Int16(ref range) => ("VAR_INT16", TypeLen::Static(2), range.min as i32, range.max as i32),
+                EntryType::UInt32(ref range) => ("VAR_UINT32", TypeLen::Static(4), range.min.min(i32::MAX as u32) as i32, range.max.min(i32::MAX as u32) as i32),
+                EntryType::Int32(ref range) => ("VAR_INT32", TypeLen::Static(4), range.min as i32, range.max as i32),
+                EntryType::Float => ("VAR_FLOAT", TypeLen::Static(4), 0, 0),
+                EntryType::Bool => ("VAR_UINT8", TypeLen::Static(1), 0, 1),
+                EntryType::String(len) => ("VAR_STRING", TypeLen::Static(len), 0, 0),
+                EntryType::Ref => ("VAR_UINT16", TypeLen::Static(2), 0, u16::MAX as i32),
+                EntryType::Region => ("VAR_REGION", TypeLen::Static(0), 0, 0),
+                EntryType::Struct(ref name) => ("VAR_STRUCT", TypeLen::Custom(format!("sizeof({})", name)), 0, 0)
             };
 
             let access_type_enum = match entry.access {
@@ -221,14 +238,15 @@ pub fn build_source<P: AsRef<Path>>(factory_parameters: &FactoryParameters, path
                 }, entry.identifier)
             };
 
-            writeln!(writer, "\t{{ 0x{:04X}, \"{}\", {}, {}, {}, {}, {}, {} }},",
-                     entry.index,
-                     entry.identifier,
-                     type_enum,
-                     type_len,
-                     access_type_enum,
-                     pointer,
-                     min, max
+            writeln!(
+                writer, "\t{{ 0x{:04X}, \"{}\", {}, {}, {}, {}, {}, {} }},",
+                entry.index,
+                entry.identifier,
+                type_enum,
+                type_len,
+                access_type_enum,
+                pointer,
+                min, max
             );
 
         }
@@ -275,5 +293,20 @@ fn get_factory_value_repr(value: &FactoryValue) -> String {
         FactoryValue::Bool(val) => (if *val { "1" } else { "0" }).to_string(),
         FactoryValue::String(val) => format!("{:?}", val),
         FactoryValue::Ref(val) => format!("0x{:04X}", *val)
+    }
+}
+
+
+enum TypeLen {
+    Static(u32),
+    Custom(String)
+}
+
+impl Display for TypeLen {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TypeLen::Static(len) => f.write_fmt(format_args!("{}", len)),
+            TypeLen::Custom(str) => f.write_str(str.as_str())
+        }
     }
 }

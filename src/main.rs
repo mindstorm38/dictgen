@@ -105,7 +105,7 @@ fn main() {
 
     println!("Building header file...");
 
-    let mut index_define_template = PrefixSuffix {
+    let index_define_template = PrefixSuffix {
         prefix: matches.value_of("index_define_prefix").unwrap(),
         suffix: matches.value_of("index_define_suffix").unwrap()
     };

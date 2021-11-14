@@ -18,7 +18,8 @@ pub enum EntryType {
     Bool,
     String(u32),
     Ref,
-    Region
+    Region,
+    Struct(String)
 }
 
 #[derive(Debug, Clone)]
@@ -173,8 +174,13 @@ impl FactoryValue {
             EntryType::Bool => FactoryValue::Bool(false),
             EntryType::String(_) => FactoryValue::String(String::new()),
             EntryType::Ref => FactoryValue::Ref(0),
-            EntryType::Region => return None
+            EntryType::Region => return None,
+            EntryType::Struct(_) => return None
         })
+    }
+
+    pub fn is_type_supported(typ: &EntryType) -> bool {
+        !matches!(typ, EntryType::Region | EntryType::Struct(_))
     }
 
 }
@@ -220,7 +226,10 @@ impl<'a> FactoryParameters<'a> {
                         EntryValueProcessor::None => {
                             match FactoryValue::default_for_type(&entry.typ) {
                                 Some(value ) => self.add_value_unchecked(entry.identifier.clone(), value),
-                                None => panic!("Unexpected entry type '{:?}', factory parameter is not supported for it.", entry.typ)
+                                None => {
+                                    // REGION and STRUCT entries does not support factory values.
+                                    // panic!("Unexpected entry type '{:?}', factory parameter is not supported for it.", entry.typ)
+                                }
                             }
                         }
                     }
@@ -236,7 +245,9 @@ impl<'a> FactoryParameters<'a> {
             );
         }
 
-        assert_eq!(self.values.len(), self.dict.parameters_count, "Factory parameters length and parameters count in dictionary should be equals after fix.");
+        // This assertion is no longer needed because with no longer panic if the no factory value
+        // is supported.
+        // assert_eq!(self.values.len(), self.dict.parameters_count, "Factory parameters length and parameters count in dictionary should be equals after fix.");
 
     }
 

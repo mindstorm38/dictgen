@@ -81,6 +81,7 @@ fn parse_entry(lexer: &mut TokenLexer) -> Result<Entry, String> {
             }
             EntryType::Region
         },
+        "STRUCT" => EntryType::Struct(String::new()),
         _ => return Err(format!("Invalid entry type '{}'.", typ_repr)),
     };
 
@@ -170,6 +171,16 @@ fn parse_entry(lexer: &mut TokenLexer) -> Result<Entry, String> {
                     Some(Token::Identifier(unknown_proc)) => return Err(format!("Unknown value processor '{}'.", unknown_proc)),
                     _ => return Err(format!("Expected a valid value processor."))
                 };
+            }
+            "struct" => {
+                if let EntryType::Struct(s) = &mut entry.typ {
+                    match lexer.next() {
+                        Some(Token::Identifier(struct_id)) => s.push_str(struct_id),
+                        _ => return Err(format!("Expected a struct identifier for the STRUCT's name."))
+                    }
+                } else {
+                    return Err(format!("Invalid 'struct' parameter for type {}, only usable on STRUCT.", typ_repr))
+                }
             }
             _ => return Err(format!("Unknown entry parameter '{}'.", param_name))
         }
@@ -348,6 +359,9 @@ fn parse_factory_value(lexer: &mut TokenLexer, entry: &Entry, dict: Option<&Dict
         }
         EntryType::Region => {
             Err(format!("The REGION type can't have factory value."))
+        }
+        EntryType::Struct(_) => {
+            Err(format!("The STRUCT type can't have factory value."))
         }
     }
 
