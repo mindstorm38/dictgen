@@ -16,7 +16,7 @@ const EXIT_BUILDING_ERROR: i32 = 3;
 fn main() {
 
     let matches = App::new("Dictionary Generator")
-        .version("1.0.2")
+        .version("1.0.3")
         .author("Théo Rozier <contact@theorozier.fr>")
         .about("Generate dictionary C source files from dictionary and factory parameters files")
         .arg(Arg::with_name("DICT")
